@@ -38,6 +38,8 @@ pipeline {
                         --severity HIGH,CRITICAL \
                         $IMAGE_TAG || true
                 '''
+                ls -lh trivy-report.json
+
             }
         }
 
