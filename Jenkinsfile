@@ -47,7 +47,7 @@ pipeline {
                 sh '''
                     curl -k -X POST "$DEFECTDOJO_URL/api/v2/import-scan/" \
                         -H "Authorization: Token $DEFECTDOJO_API_KEY" \
-                        -F "file=@@$WORKSPACE/trivy-report.json" \
+                        -F "file=@$WORKSPACE/trivy-report.json" \
                         -F "engagement=$DEFECTDOJO_ENGAGEMENT_ID" \
                         -F "scan_type=Trivy Scan" \
                         -F "auto_create_context=true" \
