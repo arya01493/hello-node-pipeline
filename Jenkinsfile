@@ -1,55 +1,3 @@
-// pipeline {
-//     agent any
-
-//     environment {
-//         REGISTRY = 'docker.io'
-//         DOCKERHUB_USER = 'narasimha96'
-//         IMAGE = "${env.DOCKERHUB_USER}/hello-node"
-//         TAG = "latest"
-//         IMAGE_TAG = "${IMAGE}:${TAG}"
-//     }
-
-//     stages {
-//         stage('Checkout') {
-//             steps { 
-//                 checkout scm 
-//             }
-//         }
-
-//         stage('Build Docker Image') {
-//             steps {
-//                 sh 'docker build -t $IMAGE_TAG .'
-//             }
-//         }
-
-//         stage('Trivy Scan (image)') {
-//             steps {
-//                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL $IMAGE_TAG || true'
-//             }
-//         }
-
-//         stage('Push to DockerHub') {
-//             steps {
-//                 withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-//                     sh '''
-//                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-//                         docker push $IMAGE_TAG
-//                         docker logout
-//                     '''
-//                 }
-//             }
-//         }
-//     }
-
-//     post {
-//         always {
-//             sh 'docker logout || true'
-//         }
-//     }
-// }
-
-
-
 pipeline {
     agent any
 
@@ -59,12 +7,17 @@ pipeline {
         IMAGE = "${env.DOCKERHUB_USER}/hello-node"
         TAG = "latest"
         IMAGE_TAG = "${IMAGE}:${TAG}"
-        REPORT_DIR = "trivy-reports"
+        DEFECTDOJO_URL = "http://localhost:8000"   // Change if running remotely
+        DEFECTDOJO_API_KEY = credentials('60bab8b852d0c69f002151ca5ab08d88083d51b3')  // Jenkins secret text
+        DEFECTDOJO_ENGAGEMENT_ID = "2"   // Replace with real engagement ID
+        DEFECTDOJO_USER_ID = "2"         // Replace with real user ID
     }
 
     stages {
         stage('Checkout') {
-            steps { checkout scm }
+            steps { 
+                checkout scm 
+            }
         }
 
         stage('Build Docker Image') {
@@ -75,37 +28,34 @@ pipeline {
 
         stage('Trivy Scan (image)') {
             steps {
-                sh """
-                mkdir -p $REPORT_DIR
-                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
-                    -v \$(pwd)/$REPORT_DIR:/reports \\
-                    aquasec/trivy image --format json --output /reports/$IMAGE_TAG.json --severity HIGH,CRITICAL $IMAGE_TAG
-                """
+                sh '''
+                    docker run --rm \
+                        -v /var/run/docker.sock:/var/run/docker.sock \
+                        -v $PWD:/root/.cache/ \
+                        aquasec/trivy image \
+                        --format json \
+                        --output trivy-report.json \
+                        --severity HIGH,CRITICAL \
+                        $IMAGE_TAG || true
+                '''
             }
         }
 
-        stage('Send Report to DefectDojo') {
+        stage('Upload to DefectDojo') {
             steps {
-                withCredentials([string(credentialsId: '60bab8b852d0c69f002151ca5ab08d88083d51b3', variable: 'DD_API_KEY')]) {
-                    script {
-                        def status = sh(script: """
-                        curl -s -o /dev/null -w "%{http_code}" -k -X POST "http://localhost:8000/api/v2/import-scan/" \\
-                          -H "Authorization: Token $DD_API_KEY" \\
-                          -F "engagement=2" \\
-                          -F "scan_type=Trivy Scan" \\
-                          -F "file=@$REPORT_DIR/$IMAGE_TAG.json" \\
-                          -F "lead=2" \\
-                          -F "active=true" \\
-                          -F "verified=true"
-                        """, returnStdout: true).trim()
-
-                        if (status != "201") {
-                            error "DefectDojo scan import failed with status: ${status}"
-                        } else {
-                            echo "Report successfully uploaded to DefectDojo"
-                        }
-                    }
-                }
+                sh '''
+                    curl -k -X POST "$DEFECTDOJO_URL/api/v2/import-scan/" \
+                        -H "Authorization: Token $DEFECTDOJO_API_KEY" \
+                        -F "file=@trivy-report.json" \
+                        -F "engagement=$DEFECTDOJO_ENGAGEMENT_ID" \
+                        -F "scan_type=Trivy Scan" \
+                        -F "auto_create_context=true" \
+                        -F "active=true" \
+                        -F "verified=true" \
+                        -F "minimum_severity=High" \
+                        -F "close_old_findings=false" \
+                        -F "push_to_jira=false"
+                '''
             }
         }
 
@@ -128,4 +78,5 @@ pipeline {
         }
     }
 }
+
 
