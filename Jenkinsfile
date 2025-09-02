@@ -8,7 +8,7 @@ pipeline {
         TAG = "latest"
         IMAGE_TAG = "${IMAGE}:${TAG}"
         DEFECTDOJO_URL = "http://localhost:8000"   // Change if running remotely
-        DEFECTDOJO_API_KEY = credentials('60bab8b852d0c69f002151ca5ab08d88083d51b3')  // Jenkins secret text
+        DEFECTDOJO_API_KEY = credentials('defectdojo-api-key')  // Jenkins secret text
         DEFECTDOJO_ENGAGEMENT_ID = "2"   // Replace with real engagement ID
         DEFECTDOJO_USER_ID = "2"         // Replace with real user ID
     }
