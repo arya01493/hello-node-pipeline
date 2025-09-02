@@ -1,3 +1,27 @@
+# Ignore Git files
+.git
+.gitignore
+
+# Node.js dependencies
 node_modules
 npm-debug.log
-.git
+yarn-error.log
+pnpm-debug.log
+
+# Logs
+*.log
+
+# Docker-related
+docker-compose*.yml
+Dockerfile*
+
+# OS / Editor files
+.DS_Store
+*.swp
+*.swo
+*.bak
+*~
+
+# Trivy scan files/folders
+trivy/
+.trivy
