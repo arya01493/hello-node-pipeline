@@ -35,25 +35,26 @@ pipeline {
 
         stage('Send Trivy Report to DefectDojo') {
             steps {
-                withCredentials([string(credentialsId: 'defectdojo-api', variable: 'DD_API')]) {
-                    sh '''
-                    curl -k -X POST "http://<defectdojo-host>:8000/api/v2/import-scan/" \
-                    -H "Authorization: Token $DD_API" \
-                    -F "file=@trivy-report.json" \
-                    -F "engagement=2" \
-                    -F "scan_type=Trivy Scan" \
-                    -F "active=true" \
-                    -F "verified=true" \
-                    -F "minimum_severity=High" \
-                    -F "close_old_findings=false"
-                    '''
+                withCredentials([string(credentialsId: 'defectdojo-api', variable: 'DD_API_KEY')]) {
+                    defectDojoPublisher(
+                        defectDojoUrl: 'http://localhost:8000',   // update to your DefectDojo URL
+                        defectDojoCredentialsId: 'defectdojo-api', // Jenkins credentials ID for API key
+                        productName: 'Hello Node',                 // existing or auto-created product
+                        engagementName: 'Trivy Engagement',        // existing or auto-created engagement
+                        scanType: 'Trivy Scan',                    // must match DefectDojo parser name
+                        artifact: 'trivy-report.json',
+                        sourceCodeUrl: "${GIT_URL}",
+                        branchTag: "${GIT_BRANCH}"
+                    )
                 }
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred',
+                                                 usernameVariable: 'DOCKER_USER',
+                                                 passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                         docker push $IMAGE_TAG
